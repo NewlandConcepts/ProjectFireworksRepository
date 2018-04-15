@@ -4,6 +4,9 @@ using UnityEngine;
 
 public class Arrow : MonoBehaviour {
 
+    private bool ArrowLanched = false;
+    private bool ArrowCollided = false;
+
 
 	// Use this for initialization
 	void Start () {
@@ -23,14 +26,41 @@ public class Arrow : MonoBehaviour {
 
     void OnTriggerEnter2D(Collider2D col)
     {
-        if (col.tag == "Enemy")
+        if (ArrowLanched)
         {
-            Destroy(col.gameObject);
-        }
+            if (col.tag == "Enemy")
+            {
+                Destroy(col.gameObject);
+            }
 
-        if (col.tag != "Player")
-        {
-            Destroy(gameObject);
+            if (col.tag != "Player")
+            {
+                
+                Destroy(gameObject);
+            }
         }
+        else
+        {
+            if(col.tag != "Player")
+            {
+                ArrowCollided = true;
+            }
+        }
+        
+    }
+
+    public void SetArrowLaunched()
+    {
+        ArrowLanched = true;
+    }
+
+    public bool GetArrowCollided()
+    {
+        return ArrowCollided;
+    }
+
+    public void DestroyImmediately()
+    {
+        Destroy(gameObject);
     }
 }

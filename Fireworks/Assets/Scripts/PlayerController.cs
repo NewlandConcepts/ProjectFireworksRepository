@@ -40,6 +40,16 @@ public class PlayerController : MonoBehaviour {
 
     public float speed = 20f;                       //...What was this used for again?
 
+    public SpriteRenderer ArrowSpriteRenderer;
+
+    private Transform wallCheck;
+
+    private Transform wallCheckLeft;
+
+    public bool walled;
+
+    public float velocityY;
+
     // Use this for initialization
 	void Awake () {
 		//setting up references
@@ -47,15 +57,27 @@ public class PlayerController : MonoBehaviour {
         anim = GetComponent<Animator>();
 		rbody = GetComponent<Rigidbody2D> ();
         sRenderer = GetComponent<SpriteRenderer>();
+        wallCheck = transform.Find("wallCheck");
+        wallCheckLeft = transform.Find("wallCheckLeft");
 	}
 	
 	// Update is called once per frame
 	void Update () {
+
+        velocityY = rbody.velocity.y;
 		// The player is grounded if a linecast to the groundcheck position hits anything on the ground layer
 		grounded = Physics2D.Linecast (transform.position, groundCheck.position, 1 << LayerMask.NameToLayer ("Ground"));
+        if (!sRenderer.flipX)
+        {
+            walled = Physics2D.Linecast(transform.position, wallCheck.position, 1 << LayerMask.NameToLayer("Ground"));
+        }
+        else
+        {
+            walled = Physics2D.Linecast(transform.position, wallCheckLeft.position, 1 << LayerMask.NameToLayer("Ground"));
+        }
 
-		// If the jump button is pressed and the player is grounded then the player should jump.
-		if (Input.GetButtonDown ("Jump") && grounded) {
+        // If the jump button is pressed and the player is grounded then the player should jump.
+        if (Input.GetButtonDown ("Jump") && grounded) {
 			jump = true;
 		}
 
@@ -151,24 +173,40 @@ public class PlayerController : MonoBehaviour {
             //The SpeedParam animator parameter is set to the absolute value of the horizontal input. 
             anim.SetFloat("SpeedParam", Mathf.Abs(h));
             anim.SetBool("isMoving", isMoving);
-			//if(h != 0)
-			//{
-	            //If the player is changing direction (h has a different sign to velocity.x) or hasn't reached max speed yet...
-	            if (h * rbody.velocity.x < maxSpeed)
-	            {
-
-	                //... add a force to the player
-	                //rbody.AddForce(Vector2.right * h * moveForce);
+            //if(h != 0)
+            //{
+            //If the player is changing direction (h has a different sign to velocity.x) or hasn't reached max speed yet...
+            if (h * rbody.velocity.x < maxSpeed)
+            {
+                if (!walled)
+                {
+                    //... add a force to the player
+                    //rbody.AddForce((Vector2.right * h * moveForce),ForceMode2D.Impulse);
 
                     // Change the player's velocity directly
-					rbody.velocity = new Vector2(1f * h * moveForce, rbody.velocity.y);
-	            }
+                    rbody.velocity = new Vector2(1f * h * moveForce, rbody.velocity.y); //Causes issue where user won't fall while facing a wall
+                }
+                else
+                {
+                   // ResetX();
+                    rbody.velocity = new Vector2(0f, rbody.velocity.y);
+                    Debug.Log("Walled 1 called");
+
+                }
+            }
 	            //If the player's horizontal velocity is greater than the maxSpeed
 	            if (Mathf.Abs(rbody.velocity.x) > maxSpeed)
 	            {
-
-	                //...set the player's velocity to the maxSpeed in the x axis
-	                rbody.velocity = new Vector2(Mathf.Sign(rbody.velocity.x) * maxSpeed, rbody.velocity.y);
+                    if (!walled)
+                    {
+                        //...set the player's velocity to the maxSpeed in the x axis
+                        rbody.velocity = new Vector2(Mathf.Sign(rbody.velocity.x) * maxSpeed, rbody.velocity.y);
+                    }
+                    else
+                    {
+                    rbody.velocity = new Vector2(0f, rbody.velocity.y);
+                    Debug.Log("Walled 2 called");
+                }
 	            }
 			//}
 			//else
@@ -180,7 +218,9 @@ public class PlayerController : MonoBehaviour {
             {
 
                 //Add a vertical force to the player
-                rbody.AddForce(new Vector2(0f, jumpForce));
+
+                //ClampVelocityY();
+               rbody.AddForce(new Vector2(0f, jumpForce),ForceMode2D.Impulse);
 
                 //Make sure the player can't jump again until the jump conditions from Update are satisfied
                 jump = false;
@@ -199,6 +239,10 @@ public class PlayerController : MonoBehaviour {
             {
                 ArrowInstance = Instantiate(arrowShot, transform.position, Quaternion.Euler(new Vector3(0, 0, 0))) as Rigidbody2D;
                 ArrowInstanceComponent = ArrowInstance.GetComponent<Arrow>();
+                ArrowSpriteRenderer = ArrowInstance.GetComponent<SpriteRenderer>();
+                ArrowSpriteRenderer.flipX = !sRenderer.flipX;
+                
+                
                 //ArrowInstanceComponent.StartDestroyCountdown();
                 FireArrow = false;
                 //ArrowInstance.velocity = new Vector2(speed, 0);
@@ -212,30 +256,36 @@ public class PlayerController : MonoBehaviour {
             //The effect of gravity on the character must also be set to zero. However this value must be changed back to 1 when the character is done attacking. 	
             rbody.gravityScale = 0f;
 
-            Debug.Log("Shoot called");
+            //Debug.Log("Shoot called");
     }
 
     void StartShootRecovery()
     {
-        
         shootRecovery = true;
         //anim.SetBool("AttackOn", false);
         //attack = false;
-        Debug.Log("StartShootRecovery called");
-        if (sRenderer.flipX == false)
-        {
-            ArrowInstance.velocity = new Vector2(speed, 0);
-        }
-        else
-        {
-            ArrowInstance.velocity = new Vector2(-1 * speed, 0);
-        }
 
-        ArrowInstanceComponent.StartDestroyCountdown();
+        if (!ArrowInstanceComponent.GetArrowCollided())
+        {
+            //Debug.Log("StartShootRecovery called");
+            if (sRenderer.flipX == false)
+            {
+                ArrowInstance.velocity = new Vector2(speed, 0);
+            }
+            else
+            {
+                ArrowInstance.velocity = new Vector2(-1 * speed, 0);
+            }
 
+            ArrowInstanceComponent.StartDestroyCountdown();
+            ArrowInstanceComponent.SetArrowLaunched();
+        }
+        else {
+            ArrowInstanceComponent.DestroyImmediately();
+        }
         anim.Play("PlayerAttackRecovery");
 
-        //ArrowInstanceComponent.StartDestroyCountdown();
+        //ArrowInstanceComponent.StartDestroyCountdown();0
 
         //EndShootRecovery();
         
@@ -264,5 +314,24 @@ public class PlayerController : MonoBehaviour {
         //ArrowInstanceComponent.StartDestroyCountdown();
 	}
 
+    public void DebugRender()
+    {
+        
+    }
+
+    public void ClampVelocityY()
+    {
+        float maxVelocityY = 300;
+        Vector2 velocity = rbody.velocity; 
+        velocity.y = Mathf.Clamp(velocity.y, Mathf.NegativeInfinity, maxVelocityY);
+        rbody.velocity = velocity;
+    }
+
+    public void ResetX()
+    {
+        Vector2 newVelocity = rbody.velocity;
+        newVelocity.x = 0f;
+        rbody.velocity = newVelocity;
+    }
 
 }
